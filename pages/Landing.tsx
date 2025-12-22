@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { ICONS } from '../constants';
 
 const Landing: React.FC = () => {
   return (
@@ -19,7 +20,7 @@ const Landing: React.FC = () => {
           <div className="hidden md:flex items-center gap-10 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
             <a href="#governance" className="hover:text-emerald-600 transition-colors">Governance</a>
             <a href="#m-and-e" className="hover:text-emerald-600 transition-colors">M&E Engine</a>
-            <a href="#resilience" className="hover:text-emerald-600 transition-colors">Resilience</a>
+            <Link to="/contact" className="hover:text-emerald-600 transition-colors">Contact Us</Link>
           </div>
           <div className="flex items-center gap-4">
             <Link to="/login" className="hidden sm:block text-xs font-black text-slate-600 px-5 py-2.5 hover:bg-slate-50 rounded-2xl transition-all uppercase tracking-widest border border-transparent">Login</Link>
@@ -141,9 +142,23 @@ const Landing: React.FC = () => {
                 We are building the trust layer for community finance in emerging markets. 
                 Our mission is to digitalize the next billion livelihood identities.
               </p>
+              
+              <div className="space-y-4 pt-4 border-t border-white/5">
+                <div className="flex items-center gap-4 group">
+                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-all"><ICONS.Mail className="w-4 h-4" /></div>
+                  <span className="text-sm font-bold text-slate-400">partnerships@kitabuyetu.org</span>
+                </div>
+                <div className="flex items-center gap-4 group">
+                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-all"><ICONS.Phone className="w-4 h-4" /></div>
+                  <span className="text-sm font-bold text-slate-400">+254 700 000 000</span>
+                </div>
+              </div>
+
               <div className="pt-6 flex gap-4">
-                 <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all cursor-pointer"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/></svg></div>
-                 <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all cursor-pointer"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg></div>
+                 <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all cursor-pointer text-slate-400 hover:text-white"><ICONS.Facebook className="w-5 h-5" /></div>
+                 <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all cursor-pointer text-slate-400 hover:text-white"><ICONS.Twitter className="w-5 h-5" /></div>
+                 <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all cursor-pointer text-slate-400 hover:text-white"><ICONS.Linkedin className="w-5 h-5" /></div>
+                 <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all cursor-pointer text-slate-400 hover:text-white"><ICONS.Instagram className="w-5 h-5" /></div>
               </div>
             </div>
             
@@ -153,7 +168,7 @@ const Landing: React.FC = () => {
                 <ul className="space-y-4 text-slate-300">
                   <li><Link to="/register/ngo" className="hover:text-emerald-400 transition-colors">NGO Dashboard</Link></li>
                   <li><a href="#" className="hover:text-emerald-400 transition-colors">Donor Portal</a></li>
-                  <li><a href="#" className="hover:text-emerald-400 transition-colors">Compliance</a></li>
+                  <li><Link to="/contact" className="hover:text-emerald-400 transition-colors">Contact Support</Link></li>
                 </ul>
               </div>
               <div className="space-y-6">

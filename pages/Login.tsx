@@ -17,6 +17,18 @@ const Login: React.FC<LoginProps> = ({ state, onLogin }) => {
 
   const handleNgoLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Super Admin Check
+    if (email === 'Polycap' && password === 'Bungoma@2026') {
+      onLogin({
+        id: 'super_admin_001',
+        name: 'Polycap (Super Admin)',
+        role: Role.SUPER_ADMIN,
+        tenantId: 'MASTER'
+      }, 'MASTER');
+      return;
+    }
+
     if (!ngoSlug) return alert('Please enter your Organization Slug.');
     const tenant = state.tenants.find(t => t.slug.toLowerCase() === ngoSlug.toLowerCase());
     if (!tenant) return alert('Organization not found. Please verify the slug.');
@@ -30,6 +42,17 @@ const Login: React.FC<LoginProps> = ({ state, onLogin }) => {
 
   const handleVslaLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    // Also allow super admin login from VSLA tab for convenience
+    if (vslaCode === 'Polycap' && password === 'Bungoma@2026') {
+      onLogin({
+        id: 'super_admin_001',
+        name: 'Polycap (Super Admin)',
+        role: Role.SUPER_ADMIN,
+        tenantId: 'MASTER'
+      }, 'MASTER');
+      return;
+    }
+    
     if (!vslaCode) return alert('Please enter your Group Invite Code.');
     const vsla = state.vslas.find(v => v.inviteCode.toUpperCase() === vslaCode.toUpperCase());
     if (!vsla) return alert('VSLA Group not found. Please check your Invite Code.');
@@ -132,15 +155,15 @@ const Login: React.FC<LoginProps> = ({ state, onLogin }) => {
             <div className="flex flex-col flex-1 animate-in slide-in-from-right-4 duration-300">
               <form onSubmit={handleNgoLogin} className="space-y-6">
                 <div>
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Organization Slug</label>
-                  <input required type="text" value={ngoSlug} onChange={e => setNgoSlug(e.target.value)} placeholder="e.g. global-impact" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-4 px-5 text-sm font-bold focus:border-emerald-500 outline-none transition-all" />
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Organization Slug / Username</label>
+                  <input required type="text" value={email} onChange={e => setEmail(e.target.value)} placeholder="Username or Email" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-4 px-5 text-sm font-bold focus:border-emerald-500 outline-none transition-all" />
                 </div>
                 <div className="space-y-4">
-                  <input type="email" placeholder="Admin Email" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-4 px-5 text-sm font-bold focus:border-emerald-500 outline-none transition-all" />
-                  <input type="password" placeholder="Password" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-4 px-5 text-sm font-bold focus:border-emerald-500 outline-none transition-all" />
+                  <input type="text" placeholder="Org Slug (if not Super Admin)" value={ngoSlug} onChange={e => setNgoSlug(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-4 px-5 text-sm font-bold focus:border-emerald-500 outline-none transition-all" />
+                  <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-4 px-5 text-sm font-bold focus:border-emerald-500 outline-none transition-all" />
                 </div>
                 <button className="w-full bg-slate-950 text-white font-black py-5 rounded-2xl hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10 active:scale-[0.98]">
-                  Access NGO Ledger
+                  Secure Access
                 </button>
               </form>
               <div className="mt-6 text-center">
@@ -153,12 +176,11 @@ const Login: React.FC<LoginProps> = ({ state, onLogin }) => {
             <div className="flex flex-col flex-1 animate-in slide-in-from-left-4 duration-300">
               <form onSubmit={handleVslaLogin} className="space-y-6">
                 <div>
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Group Invite Code</label>
-                  <input required type="text" value={vslaCode} onChange={e => setVslaCode(e.target.value)} placeholder="e.g. SUN-NAK-001" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-4 px-5 text-sm font-bold focus:border-emerald-500 outline-none transition-all" />
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Group Invite Code / Username</label>
+                  <input required type="text" value={vslaCode} onChange={e => setVslaCode(e.target.value)} placeholder="e.g. SUN-NAK-001 or Polycap" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-4 px-5 text-sm font-bold focus:border-emerald-500 outline-none transition-all" />
                 </div>
                 <div className="space-y-4">
-                  <input type="text" placeholder="Phone Number" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-4 px-5 text-sm font-bold focus:border-emerald-500 outline-none transition-all" />
-                  <input type="password" placeholder="Group PIN" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-4 px-5 text-sm font-bold focus:border-emerald-500 outline-none transition-all" />
+                  <input type="password" placeholder="PIN / Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-4 px-5 text-sm font-bold focus:border-emerald-500 outline-none transition-all" />
                 </div>
                 <button className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/10 active:scale-[0.98]">
                   Open Community Portal

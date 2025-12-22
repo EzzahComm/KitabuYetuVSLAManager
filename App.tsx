@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, Component, ErrorInfo, ReactNode, memo } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { ICONS } from './constants';
 import { AppState, Role, Transaction, TransactionType, AuditLog, ExpenseStatus, Gender, MemberStatus } from './types';
+import { apiClient } from './api';
 
 // Pages
 import Landing from './pages/Landing';
@@ -18,10 +19,51 @@ import Login from './pages/Login';
 import RegisterNgo from './pages/RegisterNgo';
 import RegisterVsla from './pages/RegisterVsla';
 import PartnershipMarketplace from './pages/PartnershipMarketplace';
+import AiStrategy from './pages/AiStrategy';
+import SuperConsole from './pages/SuperConsole';
+import Contact from './pages/Contact';
+
+/**
+ * Production Error Boundary
+ */
+class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean}> {
+  constructor(props: {children: ReactNode}) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Critical System Failure:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 text-center">
+          <div className="max-w-md space-y-6">
+            <div className="w-20 h-20 bg-rose-100 text-rose-600 rounded-3xl mx-auto flex items-center justify-center">
+              <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">System Encountered a Glitch</h1>
+              <p className="text-slate-500 font-medium">An unexpected error occurred. Your data has been preserved in local storage. Please reload to continue.</p>
+            </div>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="w-full bg-slate-900 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-slate-900/20 active:scale-95 transition-all"
+            >
+              Reload Application
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const INITIAL_STATE: AppState = {
   tenants: [
-    { id: 'KYN0001', slug: 'global-impact', name: 'Global Impact NGO', email: 'admin@globalimpact.org', country: 'Kenya', county: 'Nairobi', constituency: 'Westlands', ward: 'Parklands/Highridge', smsConfig: { gateway: 'AfricasTalking', balance: 500 } },
+    { id: 'KYN0001', slug: 'global-impact', name: 'Global Impact NGO', email: 'admin@globalimpact.org', country: 'Kenya', county: 'Mombasa', constituency: 'Westlands', ward: 'Parklands/Highridge', smsConfig: { gateway: 'AfricasTalking', balance: 500 } },
   ],
   currentTenantId: 'KYN0001',
   vslas: [
@@ -50,11 +92,15 @@ export const generateKYID = (prefix: string, count: number, padding: number) => 
   return `${prefix}${(count + 1).toString().padStart(padding, '0')}`;
 };
 
-const Sidebar: React.FC<{ state: AppState; onLogout: () => void }> = ({ state, onLogout }) => {
+// Memoized Sidebar to prevent unnecessary re-renders during state sync
+const Sidebar = memo(({ state, onLogout, syncStatus }: { state: AppState; onLogout: () => void; syncStatus: string }) => {
   const location = useLocation();
+  const isSuper = state.currentUser?.role === Role.SUPER_ADMIN;
 
-  const menu = [
-    { path: '/app', label: 'Insights & M&E', icon: <ICONS.Dashboard /> },
+  const menu = useMemo(() => [
+    ...(isSuper ? [{ path: '/app/super-console', label: 'Super Console', icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg> }] : []),
+    { path: '/app', label: isSuper ? 'Global Insights' : 'Insights & M&E', icon: <ICONS.Dashboard /> },
+    { path: '/app/ai-strategy', label: 'AI Strategy', icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> },
     { path: '/app/meetings', label: 'Meeting Sessions', icon: <ICONS.Reports /> },
     { path: '/app/loans', label: 'Loan Book', icon: <ICONS.Savings /> },
     { path: '/app/ledger', label: 'Financial Ledger', icon: <ICONS.Savings /> },
@@ -62,14 +108,7 @@ const Sidebar: React.FC<{ state: AppState; onLogout: () => void }> = ({ state, o
     { path: '/app/vslas', label: 'Group Portfolio', icon: <ICONS.Group /> },
     { path: '/app/marketplace', label: 'Impact Market', icon: <ICONS.Search /> },
     { path: '/app/audit', label: 'Audit Trail', icon: <ICONS.Search /> },
-  ];
-
-  const filteredMenu = menu.filter(item => {
-    if (state.currentUser?.role === Role.DONOR) {
-      return ['/app', '/app/vslas', '/app/marketplace', '/app/audit'].includes(item.path);
-    }
-    return true;
-  });
+  ], [isSuper]);
 
   return (
     <aside className="w-64 bg-slate-900 text-slate-300 h-screen fixed flex flex-col border-r border-slate-800 shadow-2xl z-30">
@@ -77,21 +116,34 @@ const Sidebar: React.FC<{ state: AppState; onLogout: () => void }> = ({ state, o
         <Link to="/" className="text-2xl font-black text-white flex items-center gap-2 tracking-tighter">
           <span className="text-emerald-500 underline decoration-emerald-500/30">Kitabu</span> Yetu
         </Link>
-        <div className="mt-6">
-          <label className="text-[10px] uppercase font-black text-slate-500 tracking-[0.2em] mb-2 block">Organization</label>
-          <div className="text-xs font-black text-emerald-500 bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20 truncate">
-             {state.tenants.find(t => t.id === state.currentTenantId)?.name}
+        <div className="mt-6 space-y-3">
+          <div>
+            <label className="text-[10px] uppercase font-black text-slate-500 tracking-[0.2em] mb-2 block">Environment</label>
+            <div className="text-xs font-black text-emerald-500 bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20 truncate">
+              {isSuper ? 'Super Admin Mode' : (state.tenants.find(t => t.id === state.currentTenantId)?.name || 'Tenant Node')}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 px-1">
+            <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'syncing' ? 'bg-amber-400 animate-pulse' : syncStatus === 'error' ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
+            <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+              {syncStatus === 'syncing' ? 'Syncing to Sheets...' : syncStatus === 'error' ? 'Cloud Sync Offline' : 'Database Verified'}
+            </span>
           </div>
         </div>
       </div>
       
       <nav className="flex-1 mt-6 overflow-y-auto no-scrollbar px-3 space-y-1">
-        {filteredMenu.map(item => (
+        {menu.filter(item => {
+          if (state.currentUser?.role === Role.DONOR) {
+            return ['/app', '/app/vslas', '/app/marketplace', '/app/audit'].includes(item.path);
+          }
+          return true;
+        }).map(item => (
           <Link 
             key={item.path} 
             to={item.path} 
-            className={`flex items-center gap-3 px-5 py-3.5 text-xs font-black uppercase tracking-widest rounded-2xl transition-all duration-300 ${
-              location.pathname === item.path ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 translate-x-1' : 'hover:bg-slate-800 hover:text-white text-slate-400'
+            className={`flex items-center gap-3 px-5 py-3.5 text-xs font-black uppercase tracking-widest rounded-2xl transition-all duration-200 ${
+              location.pathname === item.path ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30' : 'hover:bg-slate-800 hover:text-white text-slate-400'
             }`}
           >
             <span className={location.pathname === item.path ? 'text-white' : 'text-emerald-500/60'}>{item.icon}</span>
@@ -118,7 +170,33 @@ const Sidebar: React.FC<{ state: AppState; onLogout: () => void }> = ({ state, o
       </div>
     </aside>
   );
-};
+});
+
+// Memoized Header
+const AppHeader = memo(({ syncStatus, availableCash, isSuper, onManualSync }: { syncStatus: string; availableCash: number; isSuper: boolean; onManualSync: () => void }) => (
+  <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-10 sticky top-0 z-20 shadow-sm">
+    <div className="flex items-center gap-3">
+      <div className={`w-2.5 h-2.5 rounded-full ${syncStatus === 'syncing' ? 'bg-amber-400 animate-pulse' : syncStatus === 'error' ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
+      <span className="text-slate-900 text-xs font-black uppercase tracking-widest">
+        {syncStatus === 'syncing' ? 'Publishing Updates...' : syncStatus === 'error' ? 'Local-First Mode (Sync Offline)' : (isSuper ? 'Super Console Active' : 'Identity Verified')}
+      </span>
+    </div>
+    <div className="flex items-center gap-8">
+      <div className="text-right">
+        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Global Liquidity Pool</p>
+        <p className="text-sm font-black text-slate-900 tracking-tight">KES {availableCash.toLocaleString()}</p>
+      </div>
+      <div className="w-px h-8 bg-slate-100"></div>
+      <button 
+        onClick={onManualSync}
+        className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer transition-all shadow-sm"
+        title="Force Cloud Synchronization"
+      >
+        <svg className={`w-5 h-5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      </button>
+    </div>
+  </header>
+));
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
@@ -126,8 +204,36 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : INITIAL_STATE;
   });
 
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+
+  // Persistence and Cloud Sync
   useEffect(() => {
     localStorage.setItem('kitabu_v1_production', JSON.stringify(state));
+    
+    const handler = setTimeout(async () => {
+      if (state.currentUser) {
+        setSyncStatus('syncing');
+        try {
+          await apiClient.syncToSheets(state);
+          setSyncStatus('success');
+          setTimeout(() => setSyncStatus('idle'), 3000);
+        } catch (e) {
+          setSyncStatus('error');
+        }
+      }
+    }, 5000);
+
+    return () => clearTimeout(handler);
+  }, [state]);
+
+  const handleManualSync = useCallback(() => {
+    setSyncStatus('syncing');
+    apiClient.syncToSheets(state)
+      .then(() => {
+        setSyncStatus('success');
+        setTimeout(() => setSyncStatus('idle'), 2000);
+      })
+      .catch(() => setSyncStatus('error'));
   }, [state]);
 
   const logAudit = useCallback((action: string, details: string) => {
@@ -153,16 +259,22 @@ const App: React.FC = () => {
   }, [state.currentTenantId]);
 
   const scopedData = useMemo(() => {
-    const vslaIds = state.vslas.filter(v => v.tenantId === state.currentTenantId).map(v => v.id);
-    const members = state.members.filter(m => m.tenantId === state.currentTenantId);
-    const transactions = state.transactions.filter(t => t.tenantId === state.currentTenantId);
+    const isSuper = state.currentUser?.role === Role.SUPER_ADMIN;
+    
+    const vslaFilter = (v: any) => isSuper || v.tenantId === state.currentTenantId;
+    const memberFilter = (m: any) => isSuper || m.tenantId === state.currentTenantId;
+    const txFilter = (t: any) => isSuper || t.tenantId === state.currentTenantId;
+
+    const vslas = state.vslas.filter(vslaFilter);
+    const vslaIds = vslas.map(v => v.id);
+    const members = state.members.filter(memberFilter);
+    const transactions = state.transactions.filter(txFilter);
     const loans = state.loans.filter(l => vslaIds.includes(l.vslaId));
     const expenses = state.expenses.filter(e => vslaIds.includes(e.vslaId));
     const projects = state.investmentProjects.filter(p => vslaIds.includes(p.vslaId));
     const projectTx = state.projectTransactions.filter(pt => projects.some(p => p.id === pt.projectId));
-    const partnershipProjects = state.partnershipProjects.filter(pp => pp.tenantId === state.currentTenantId);
+    const partnershipProjects = state.partnershipProjects.filter(pp => isSuper || pp.tenantId === state.currentTenantId);
 
-    // Derived Financial Intelligence
     const totals = transactions.reduce((acc, t) => {
       if (t.type === TransactionType.SAVINGS || t.type === TransactionType.SHARE_PURCHASE) acc.savings += t.amount;
       if (t.type === TransactionType.LOAN_REPAYMENT_PRINCIPAL) acc.repaidPrincipal += t.amount;
@@ -180,13 +292,10 @@ const App: React.FC = () => {
       .reduce((acc, e) => acc + e.amount, 0);
 
     const outstandingLoanPrincipal = loans.reduce((acc, l) => acc + (l.status === 'Active' ? l.remainingPrincipal : 0), 0);
-
-    const totalInflow = totals.savings + totals.repaidPrincipal + totals.earnedInterest + totals.fines + totals.fees + totals.welfare;
-    const totalOutflow = totals.disbursed + totalApprovedExpenses + totals.dividends;
-    const availableCash = Math.max(0, totalInflow - totalOutflow);
+    const availableCash = Math.max(0, (totals.savings + totals.repaidPrincipal + totals.earnedInterest + totals.fines + totals.fees + totals.welfare) - (totals.disbursed + totalApprovedExpenses + totals.dividends));
 
     return {
-      vslas: state.vslas.filter(v => v.tenantId === state.currentTenantId),
+      vslas,
       members,
       transactions,
       loans,
@@ -196,7 +305,7 @@ const App: React.FC = () => {
       partnershipProjects,
       meetings: state.meetings.filter(m => vslaIds.includes(m.vslaId)),
       attendance: state.attendance,
-      auditLogs: state.auditLogs.filter(l => l.tenantId === state.currentTenantId),
+      auditLogs: isSuper ? state.auditLogs : state.auditLogs.filter(l => l.tenantId === state.currentTenantId),
       financials: { 
         ...totals, 
         outstandingLoanPrincipal, 
@@ -208,49 +317,44 @@ const App: React.FC = () => {
 
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login state={state} onLogin={(u, t) => { setState(p => ({...p, currentUser: u, currentTenantId: t})); logAudit('LOGIN', 'Production node access granted'); }} />} />
-        <Route path="/register/ngo" element={<RegisterNgo state={state} onRegister={(t) => { setState(p => ({...p, tenants: [...p.tenants, t]})); logAudit('ORG_PROV', `Organization ${t.name} provisioned`); }} />} />
-        <Route path="/register/vsla" element={<RegisterVsla state={state} onRegister={(v) => { setState(p => ({...p, vslas: [...p.vslas, v]})); logAudit('VSLA_REG', `New association provisioned: ${v.name}`); }} />} />
-        <Route path="/app/*" element={
-          !state.currentUser ? <Navigate to="/login" /> : (
-            <div className="min-h-screen flex bg-slate-50">
-              <Sidebar state={state} onLogout={() => setState(p => ({...p, currentUser: null}))} />
-              <div className="flex-1 ml-64 flex flex-col">
-                <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-10 sticky top-0 z-20 shadow-sm">
-                   <div className="flex items-center gap-3">
-                     <span className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">Runtime ID:</span>
-                     <span className="bg-emerald-500/10 text-emerald-600 text-[10px] font-black px-3 py-1 rounded-full uppercase border border-emerald-500/20 tracking-tighter">Instance Active</span>
-                   </div>
-                   <div className="flex items-center gap-8">
-                      <div className="text-right">
-                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Available Liquidity</p>
-                         <p className="text-sm font-black text-slate-900 tracking-tight">KES {scopedData.financials.availableCash.toLocaleString()}</p>
-                      </div>
-                      <div className="w-px h-8 bg-slate-100"></div>
-                      <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer transition-all">
-                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-                      </div>
-                   </div>
-                </header>
-                <main className="p-10 max-w-7xl mx-auto w-full">
-                  <Routes>
-                    <Route path="/" element={state.currentUser.role === Role.DONOR ? <DonorDashboard state={state} scoped={scopedData} /> : <Dashboard state={state} scoped={scopedData} />} />
-                    <Route path="/meetings" element={<MeetingManagement state={state} scoped={scopedData} setState={setState} logAudit={logAudit} addTransaction={addTransaction} />} />
-                    <Route path="/loans" element={<LoanManagement state={state} scoped={scopedData} setState={setState} logAudit={logAudit} addTransaction={addTransaction} />} />
-                    <Route path="/ledger" element={<FinancialLedger state={state} scoped={scopedData} addTransaction={addTransaction} />} />
-                    <Route path="/members" element={<MemberManagement state={state} scoped={scopedData} setState={setState} logAudit={logAudit} />} />
-                    <Route path="/vslas" element={<VslaManagement state={state} scoped={scopedData} setState={setState} logAudit={logAudit} />} />
-                    <Route path="/marketplace" element={<PartnershipMarketplace state={state} scoped={scopedData} setState={setState} logAudit={logAudit} />} />
-                    <Route path="/audit" element={<AuditCenter logs={scopedData.auditLogs} />} />
-                  </Routes>
-                </main>
+      <ErrorBoundary>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/login" element={<Login state={state} onLogin={(u, t) => { setState(p => ({...p, currentUser: u, currentTenantId: t})); logAudit('LOGIN', `Active session for ${u.role}`); }} />} />
+          <Route path="/register/ngo" element={<RegisterNgo state={state} onRegister={(t) => { setState(p => ({...p, tenants: [...p.tenants, t]})); logAudit('ORG_PROV', `NGO provisioned: ${t.name}`); }} />} />
+          <Route path="/register/vsla" element={<RegisterVsla state={state} onRegister={(v) => { setState(p => ({...p, vslas: [...p.vslas, v]})); logAudit('VSLA_REG', `VSLA provisioned: ${v.name}`); }} />} />
+          <Route path="/app/*" element={
+            !state.currentUser ? <Navigate to="/login" /> : (
+              <div className="min-h-screen flex bg-slate-50">
+                <Sidebar state={state} onLogout={() => setState(p => ({...p, currentUser: null}))} syncStatus={syncStatus} />
+                <div className="flex-1 ml-64 flex flex-col">
+                  <AppHeader 
+                    syncStatus={syncStatus} 
+                    availableCash={scopedData.financials.availableCash} 
+                    isSuper={state.currentUser.role === Role.SUPER_ADMIN} 
+                    onManualSync={handleManualSync}
+                  />
+                  <main className="p-10 max-w-7xl mx-auto w-full page-transition">
+                    <Routes>
+                      <Route path="/" element={state.currentUser.role === Role.DONOR ? <DonorDashboard state={state} scoped={scopedData} /> : <Dashboard state={state} scoped={scopedData} />} />
+                      <Route path="/super-console" element={state.currentUser.role === Role.SUPER_ADMIN ? <SuperConsole state={state} scoped={scopedData} setState={setState} /> : <Navigate to="/app" />} />
+                      <Route path="/ai-strategy" element={<AiStrategy state={state} scoped={scopedData} />} />
+                      <Route path="/meetings" element={<MeetingManagement state={state} scoped={scopedData} setState={setState} logAudit={logAudit} addTransaction={addTransaction} />} />
+                      <Route path="/loans" element={<LoanManagement state={state} scoped={scopedData} setState={setState} logAudit={logAudit} addTransaction={addTransaction} />} />
+                      <Route path="/ledger" element={<FinancialLedger state={state} scoped={scopedData} addTransaction={addTransaction} />} />
+                      <Route path="/members" element={<MemberManagement state={state} scoped={scopedData} setState={setState} logAudit={logAudit} />} />
+                      <Route path="/vslas" element={<VslaManagement state={state} scoped={scopedData} setState={setState} logAudit={logAudit} />} />
+                      <Route path="/marketplace" element={<PartnershipMarketplace state={state} scoped={scopedData} setState={setState} logAudit={logAudit} />} />
+                      <Route path="/audit" element={<AuditCenter logs={scopedData.auditLogs} />} />
+                    </Routes>
+                  </main>
+                </div>
               </div>
-            </div>
-          )
-        } />
-      </Routes>
+            )
+          } />
+        </Routes>
+      </ErrorBoundary>
     </Router>
   );
 };
