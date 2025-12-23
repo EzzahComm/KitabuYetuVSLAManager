@@ -44,14 +44,14 @@ class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean}
               <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             </div>
             <div className="space-y-2">
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">System Encountered a Glitch</h1>
-              <p className="text-slate-500 font-medium">An unexpected error occurred. Your data has been preserved in local storage. Please reload to continue.</p>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">System Reset Required</h1>
+              <p className="text-slate-500 font-medium">An unexpected error occurred during state synchronization. Your data is safe in the cloud.</p>
             </div>
             <button 
               onClick={() => { localStorage.clear(); window.location.reload(); }} 
               className="w-full bg-slate-900 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-slate-900/20 active:scale-95 transition-all"
             >
-              Reset & Reload
+              Clear Cache & Reload
             </button>
           </div>
         </div>
@@ -90,10 +90,15 @@ const INITIAL_STATE: AppState = {
 
 /**
  * State Schema Enforcement: Guarantees that the app state always 
- * has necessary arrays and properties to prevent crash.
+ * has necessary arrays and properties to prevent crash during renders.
  */
 const safeState = (data: any): AppState => {
-  const base = { ...INITIAL_STATE, ...(data || {}) };
+  if (!data || typeof data !== 'object') return INITIAL_STATE;
+  
+  // Create a base by merging initial state with loaded data
+  const base = { ...INITIAL_STATE, ...data };
+  
+  // Explicitly ensure every array property is actually an array
   return {
     ...base,
     tenants: Array.isArray(base.tenants) ? base.tenants : INITIAL_STATE.tenants,
@@ -109,6 +114,8 @@ const safeState = (data: any): AppState => {
     partnershipProjects: Array.isArray(base.partnershipProjects) ? base.partnershipProjects : INITIAL_STATE.partnershipProjects,
     transactions: Array.isArray(base.transactions) ? base.transactions : INITIAL_STATE.transactions,
     auditLogs: Array.isArray(base.auditLogs) ? base.auditLogs : INITIAL_STATE.auditLogs,
+    currentTenantId: base.currentTenantId || INITIAL_STATE.currentTenantId,
+    currentUser: base.currentUser || null
   };
 };
 
@@ -143,13 +150,13 @@ const Sidebar = memo(({ state, onLogout, syncStatus }: { state: AppState; onLogo
           <div>
             <label className="text-[10px] uppercase font-black text-slate-500 tracking-[0.2em] mb-2 block">Environment</label>
             <div className="text-xs font-black text-emerald-500 bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20 truncate">
-              {isSuper ? 'Super Admin Mode' : (state.tenants.find(t => t.id === state.currentTenantId)?.name || 'Google Cloud Node')}
+              {isSuper ? 'Super Admin Mode' : (state.tenants.find(t => t.id === state.currentTenantId)?.name || 'Cloud Node')}
             </div>
           </div>
           <div className="flex items-center gap-2 px-1">
             <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'syncing' ? 'bg-amber-400 animate-pulse' : syncStatus === 'error' ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
             <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">
-              {syncStatus === 'syncing' ? 'Publishing to Sheets...' : syncStatus === 'error' ? 'Sheets Sync Failed' : 'Cloud Ledger Online'}
+              {syncStatus === 'syncing' ? 'Publishing...' : syncStatus === 'error' ? 'Sync Failed' : 'Cloud Online'}
             </span>
           </div>
         </div>
@@ -200,19 +207,19 @@ const AppHeader = memo(({ syncStatus, availableCash, isSuper, onManualSync }: { 
     <div className="flex items-center gap-3">
       <div className={`w-2.5 h-2.5 rounded-full ${syncStatus === 'syncing' ? 'bg-amber-400 animate-pulse' : syncStatus === 'error' ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
       <span className="text-slate-900 text-xs font-black uppercase tracking-widest">
-        {syncStatus === 'syncing' ? 'Updating Google Sheets...' : syncStatus === 'error' ? 'Local Buffer Only (Offline)' : (isSuper ? 'Master Console Active' : 'Verified Cloud Access')}
+        {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'error' ? 'Sync Failed' : (isSuper ? 'Super Console' : 'Cloud Ledger')}
       </span>
     </div>
     <div className="flex items-center gap-8">
       <div className="text-right">
-        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Global Liquidity Pool</p>
-        <p className="text-sm font-black text-slate-900 tracking-tight">KES {availableCash.toLocaleString()}</p>
+        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Portfolio Cash</p>
+        <p className="text-sm font-black text-slate-900 tracking-tight">KES {Number(availableCash || 0).toLocaleString()}</p>
       </div>
       <div className="w-px h-8 bg-slate-100"></div>
       <button 
         onClick={onManualSync}
         className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer transition-all shadow-sm"
-        title="Sync to Sheets Now"
+        title="Sync Now"
       >
         <svg className={`w-5 h-5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
       </button>
@@ -228,27 +235,32 @@ const App: React.FC = () => {
       const parsed = JSON.parse(saved);
       return safeState(parsed);
     } catch (e) {
+      console.error("Local state parse failed:", e);
       return INITIAL_STATE;
     }
   });
 
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
 
+  // Hydration Effect
   useEffect(() => {
+    let isMounted = true;
     const hydrate = async () => {
       try {
         const cloudState = await apiClient.fetchLatest();
-        if (cloudState && cloudState.currentTenantId) {
-          setState(safeState(cloudState));
-          console.log("Cloud state hydrated from Google Sheets.");
+        if (isMounted && cloudState && cloudState.currentTenantId) {
+          setState(prev => safeState({ ...prev, ...cloudState }));
+          console.log("Hydration: Cloud State merged.");
         }
       } catch (e) {
-        console.warn("Cloud hydration failed. Using local storage.", e);
+        console.warn("Hydration: Failure (Offline mode active)", e);
       }
     };
     hydrate();
+    return () => { isMounted = false; };
   }, []);
 
+  // Auto-Save Effect
   useEffect(() => {
     localStorage.setItem('kitabu_v1_gas_production', JSON.stringify(state));
     const handler = setTimeout(async () => {
@@ -262,7 +274,7 @@ const App: React.FC = () => {
           setSyncStatus('error');
         }
       }
-    }, 15000);
+    }, 30000); // 30s debounce to respect GAS quotas
     return () => clearTimeout(handler);
   }, [state]);
 
@@ -299,12 +311,12 @@ const App: React.FC = () => {
   }, [state.currentTenantId]);
 
   const scopedData = useMemo(() => {
-    const isSuper = state.currentUser?.role === Role.SUPER_ADMIN;
     const currentTenantId = state.currentTenantId || '';
+    const isSuper = state.currentUser?.role === Role.SUPER_ADMIN;
     
-    const vslaFilter = (v: any) => isSuper || v?.tenantId === currentTenantId;
-    const memberFilter = (m: any) => isSuper || m?.tenantId === currentTenantId;
-    const txFilter = (t: any) => isSuper || t?.tenantId === currentTenantId;
+    const vslaFilter = (v: any) => isSuper || (v && v.tenantId === currentTenantId);
+    const memberFilter = (m: any) => isSuper || (m && m.tenantId === currentTenantId);
+    const txFilter = (t: any) => isSuper || (t && t.tenantId === currentTenantId);
 
     const vslas = (state.vslas || []).filter(vslaFilter);
     const vslaIds = vslas.map(v => v.id);
@@ -314,36 +326,30 @@ const App: React.FC = () => {
     const expenses = (state.expenses || []).filter(e => vslaIds.includes(e.vslaId));
     const projects = (state.investmentProjects || []).filter(p => vslaIds.includes(p.vslaId));
     const projectTx = (state.projectTransactions || []).filter(pt => projects.some(p => p.id === pt.projectId));
-    const partnershipProjects = (state.partnershipProjects || []).filter(pp => isSuper || pp?.tenantId === currentTenantId);
+    const partnershipProjects = (state.partnershipProjects || []).filter(pp => isSuper || (pp && pp.tenantId === currentTenantId));
 
     const totals = transactions.reduce((acc, t) => {
-      if (t.type === TransactionType.SAVINGS || t.type === TransactionType.SHARE_PURCHASE) acc.savings += (t.amount || 0);
-      if (t.type === TransactionType.LOAN_REPAYMENT_PRINCIPAL) acc.repaidPrincipal += (t.amount || 0);
-      if (t.type === TransactionType.LOAN_REPAYMENT_INTEREST) acc.earnedInterest += (t.amount || 0);
-      if (t.type === TransactionType.FINE) acc.fines += (t.amount || 0);
-      if (t.type === TransactionType.REGISTRATION_FEE) acc.fees += (t.amount || 0);
-      if (t.type === TransactionType.WELFARE_CONTRIBUTION) acc.welfare += (t.amount || 0);
-      if (t.type === TransactionType.LOAN_ISSUE) acc.disbursed += (t.amount || 0);
-      if (t.type === TransactionType.DIVIDEND_PAYOUT) acc.dividends += (t.amount || 0);
+      const amount = Number(t.amount || 0);
+      if (t.type === TransactionType.SAVINGS || t.type === TransactionType.SHARE_PURCHASE) acc.savings += amount;
+      if (t.type === TransactionType.LOAN_REPAYMENT_PRINCIPAL) acc.repaidPrincipal += amount;
+      if (t.type === TransactionType.LOAN_REPAYMENT_INTEREST) acc.earnedInterest += amount;
+      if (t.type === TransactionType.FINE) acc.fines += amount;
+      if (t.type === TransactionType.REGISTRATION_FEE) acc.fees += amount;
+      if (t.type === TransactionType.WELFARE_CONTRIBUTION) acc.welfare += amount;
+      if (t.type === TransactionType.LOAN_ISSUE) acc.disbursed += amount;
+      if (t.type === TransactionType.DIVIDEND_PAYOUT) acc.dividends += amount;
       return acc;
     }, { savings: 0, disbursed: 0, repaidPrincipal: 0, earnedInterest: 0, fines: 0, fees: 0, welfare: 0, dividends: 0 });
 
     const totalApprovedExpenses = expenses
       .filter(e => e.status === ExpenseStatus.APPROVED)
-      .reduce((acc, e) => acc + (e.amount || 0), 0);
+      .reduce((acc, e) => acc + Number(e.amount || 0), 0);
 
-    const outstandingLoanPrincipal = loans.reduce((acc, l) => acc + (l.status === 'Active' ? (l.remainingPrincipal || 0) : 0), 0);
+    const outstandingLoanPrincipal = loans.reduce((acc, l) => acc + (l.status === 'Active' ? Number(l.remainingPrincipal || 0) : 0), 0);
     const availableCash = Math.max(0, (totals.savings + totals.repaidPrincipal + totals.earnedInterest + totals.fines + totals.fees + totals.welfare) - (totals.disbursed + totalApprovedExpenses + totals.dividends));
 
     return {
-      vslas,
-      members,
-      transactions,
-      loans,
-      expenses,
-      projects,
-      projectTx,
-      partnershipProjects,
+      vslas, members, transactions, loans, expenses, projects, projectTx, partnershipProjects,
       meetings: (state.meetings || []).filter(m => vslaIds.includes(m.vslaId)),
       attendance: state.attendance || [],
       auditLogs: isSuper ? (state.auditLogs || []) : (state.auditLogs || []).filter(l => l.tenantId === currentTenantId),
@@ -354,7 +360,7 @@ const App: React.FC = () => {
         availableCash
       }
     };
-  }, [state, state.currentTenantId, state.currentUser]);
+  }, [state]);
 
   return (
     <Router>
@@ -362,11 +368,11 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/contact" element={<Contact />} />
-          <Route path="/login" element={<Login state={state} onLogin={(u, t) => { setState(p => safeState({...p, currentUser: u, currentTenantId: t})); logAudit('LOGIN', `Google App Session Started: ${u.role}`); }} />} />
-          <Route path="/register/ngo" element={<RegisterNgo state={state} onRegister={(t) => { setState(p => safeState({...p, tenants: [...(p.tenants || []), t]})); logAudit('ORG_PROV', `NGO provisioned: ${t.name}`); }} />} />
-          <Route path="/register/vsla" element={<RegisterVsla state={state} onRegister={(v) => { setState(p => safeState({...p, vslas: [...(p.vslas || []), v]})); logAudit('VSLA_REG', `VSLA provisioned: ${v.name}`); }} />} />
+          <Route path="/login" element={<Login state={state} onLogin={(u, t) => { setState(p => safeState({...p, currentUser: u, currentTenantId: t})); logAudit('LOGIN', `Session Initiated: ${u.role}`); }} />} />
+          <Route path="/register/ngo" element={<RegisterNgo state={state} onRegister={(t) => { setState(p => safeState({...p, tenants: [...(p.tenants || []), t]})); logAudit('ORG_REG', `NGO Registered: ${t.name}`); }} />} />
+          <Route path="/register/vsla" element={<RegisterVsla state={state} onRegister={(v) => { setState(p => safeState({...p, vslas: [...(p.vslas || []), v]})); logAudit('VSLA_REG', `VSLA Registered: ${v.name}`); }} />} />
           <Route path="/app/*" element={
-            !state.currentUser ? <Navigate to="/login" /> : (
+            !state.currentUser ? <Navigate to="/login" replace /> : (
               <div className="min-h-screen flex bg-slate-50">
                 <Sidebar state={state} onLogout={() => setState(p => safeState({...p, currentUser: null}))} syncStatus={syncStatus} />
                 <div className="flex-1 ml-64 flex flex-col">
@@ -379,7 +385,7 @@ const App: React.FC = () => {
                   <main className="p-10 max-w-7xl mx-auto w-full page-transition">
                     <Routes>
                       <Route path="/" element={state.currentUser.role === Role.DONOR ? <DonorDashboard state={state} scoped={scopedData} /> : <Dashboard state={state} scoped={scopedData} />} />
-                      <Route path="/super-console" element={state.currentUser.role === Role.SUPER_ADMIN ? <SuperConsole state={state} scoped={scopedData} setState={setState} /> : <Navigate to="/app" />} />
+                      <Route path="/super-console" element={state.currentUser.role === Role.SUPER_ADMIN ? <SuperConsole state={state} scoped={scopedData} setState={setState} /> : <Navigate to="/app" replace />} />
                       <Route path="/ai-strategy" element={<AiStrategy state={state} scoped={scopedData} />} />
                       <Route path="/meetings" element={<MeetingManagement state={state} scoped={scopedData} setState={setState} logAudit={logAudit} addTransaction={addTransaction} />} />
                       <Route path="/loans" element={<LoanManagement state={state} scoped={scopedData} setState={setState} logAudit={logAudit} addTransaction={addTransaction} />} />
@@ -394,6 +400,7 @@ const App: React.FC = () => {
               </div>
             )
           } />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </ErrorBoundary>
     </Router>

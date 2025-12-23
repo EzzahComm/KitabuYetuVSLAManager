@@ -20,12 +20,12 @@
     <script type="importmap">
 {
   "imports": {
-    "react-router-dom": "https://esm.sh/react-router-dom@^7.11.0",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom": "https://esm.sh/react-dom@^19.2.3",
-    "react-dom/client": "https://esm.sh/react-dom@^19.2.3/client",
-    "recharts": "https://esm.sh/recharts@^3.6.0",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "react-router-dom": "https://esm.sh/react-router-dom@7.1.1?deps=react@19.0.0,react-dom@19.0.0",
+    "recharts": "https://esm.sh/recharts@3.0.0-beta.10?deps=react@19.0.0,react-dom@19.0.0",
+    "@google/genai": "https://esm.sh/@google/genai@1.34.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/"
   }
@@ -50,14 +50,18 @@
        */
       window.process = { env: { API_KEY: "" } };
       
-      // If we're in a Google Apps Script context, fetch the actual key
+      // Fetch environment config from GAS if available
       if (typeof google !== 'undefined' && google.script && google.script.run) {
-        google.script.run.withSuccessHandler(function(config) {
-          if (config && config.API_KEY) {
-            window.process.env.API_KEY = config.API_KEY;
-            console.log("Kitabu Yetu: GAS API Key Hydrated.");
-          }
-        }).getEnvConfig();
+        try {
+          google.script.run.withSuccessHandler(function(config) {
+            if (config && config.API_KEY) {
+              window.process.env.API_KEY = config.API_KEY;
+              console.log("Environment: GAS API Key Loaded.");
+            }
+          }).getEnvConfig();
+        } catch (e) {
+          console.error("Environment: Failed to initiate GAS config fetch.", e);
+        }
       }
     </script>
 </body>

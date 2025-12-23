@@ -24,14 +24,20 @@ const callGasFunction = (functionName: string, ...args: any[]): Promise<any> => 
 
 export const apiClient = {
   syncToSheets: async (state: any) => {
+    // Stringify here ensures we send a clean JSON blob to GAS
     return await callGasFunction('saveAppData', JSON.stringify(state));
   },
   fetchLatest: async () => {
-    const data = await callGasFunction('getAppData');
-    if (!data) return null;
     try {
-      return typeof data === 'string' ? JSON.parse(data) : data;
+      const data = await callGasFunction('getAppData');
+      if (!data) return null;
+      
+      // GAS sometimes returns proxies or wrapped objects; 
+      // parsing a stringified version ensures a clean JS object for React state.
+      const rawString = typeof data === 'string' ? data : JSON.stringify(data);
+      return JSON.parse(rawString);
     } catch (e) {
+      console.error("API: Hydration error", e);
       return null;
     }
   }

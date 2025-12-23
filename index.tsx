@@ -6,11 +6,8 @@ import App from './App';
 const rootElement = document.getElementById('root');
 if (rootElement) {
   const root = ReactDOM.createRoot(rootElement);
-  root.render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>
-  );
+  // Removing StrictMode temporarily to stabilize hydration in the Google Apps Script iframe
+  root.render(<App />);
 } else {
   console.error("Critical Failure: Root element not found.");
 }
